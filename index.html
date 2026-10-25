@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>서울 상업용 실거래 지도</title>
+<link rel="stylesheet" href="design-tokens.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif;-webkit-font-smoothing:antialiased}
+#map{position:absolute;inset:0}
+.panel{position:absolute;background:var(--glass);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-radius:18px;box-shadow:var(--sh-card);padding:14px 16px;z-index:5}
+#top{top:max(12px,var(--safe-t,0px));left:12px;right:12px;display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;padding:12px 16px}
+#top h1{font-size:17px;margin:0;font-weight:800;letter-spacing:-.2px}
+#top .sub{font-size:12.5px;color:var(--text-sub)}
+#top .pill{font-size:11.5px;font-weight:700;color:var(--blue);background:var(--blue-weak);padding:3px 9px;border-radius:99px}
+#top a{margin-left:auto;font-size:13px;color:var(--blue);text-decoration:none;font-weight:700}
+#layers{top:84px;right:12px;width:218px;font-size:13.5px}
+#layers h2,#card h2{font-size:11.5px;color:var(--text-weak);margin:0 0 6px;font-weight:700;letter-spacing:.2px}
+#layers label{display:flex;align-items:center;gap:9px;padding:6px 0;cursor:pointer;min-height:32px}
+#layers input{width:16px;height:16px;accent-color:var(--blue)}
+.sw{width:12px;height:12px;border-radius:50%;display:inline-block;flex:none}
+#lt{display:none;position:absolute;top:0;right:0;border:0;background:none;font-size:12px;color:var(--text-weak);padding:12px 14px;cursor:pointer}
+.legend{height:8px;border-radius:4px;margin:8px 0 2px;background:linear-gradient(90deg,#CFE3FF,#3182F6,#7B2CBF,#C1121F)}
+.legend-l{display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-weak)}
+#card{top:84px;left:12px;width:300px;display:none;font-size:13.5px;max-height:calc(100% - 260px);overflow:auto}
+#card .t{font-size:16px;font-weight:800;margin:0 0 6px;line-height:1.3}
+#card .big{font-size:22px;font-weight:800;color:var(--blue);margin:0 0 8px}
+#card .row{display:flex;justify-content:space-between;gap:12px;padding:4px 0;color:var(--text-sub);border-top:1px solid var(--line-2)}
+#card .row b{color:var(--text);text-align:right}
+#card .warn{margin-top:10px;padding:9px 11px;border-radius:12px;background:var(--danger-bg);color:var(--danger);font-size:12.5px;line-height:1.5}
+#card .x{position:absolute;top:8px;right:14px;cursor:pointer;color:var(--text-weak);font-size:22px;line-height:1}
+#time{left:12px;right:242px;bottom:46px}
+#time .hd{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:4px}
+#time .hd span{color:var(--text-sub)}
+#bars{width:100%;height:50px;display:block}
+.rng{position:relative;height:24px}
+.rng input{position:absolute;left:0;width:100%;margin:0;pointer-events:none;-webkit-appearance:none;appearance:none;background:none;height:24px}
+.rng input::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--blue);border:3px solid var(--surface);box-shadow:var(--sh-card);cursor:pointer}
+.rng input::-moz-range-thumb{pointer-events:auto;width:16px;height:16px;border-radius:50%;background:var(--blue);border:3px solid var(--surface);cursor:pointer}
+.rng .track{position:absolute;left:0;right:0;top:10px;height:4px;border-radius:2px;background:var(--line)}
+.rng .fill{position:absolute;top:10px;height:4px;border-radius:2px;background:var(--blue)}
+.axis{display:flex;justify-content:space-between;font-size:10.5px;color:var(--text-weak);margin-top:-2px}
+#foot{left:0;right:0;bottom:0;border-radius:0;padding:7px 14px max(7px,env(safe-area-inset-bottom));font-size:11px;color:var(--text-weak);line-height:1.45}
+.maplibregl-ctrl-bottom-right{bottom:46px}
+.maplibregl-popup-content{border-radius:12px;padding:8px 12px;font:600 13px -apple-system,sans-serif;color:#191F28}
+@media (max-width:760px){
+  #top h1{font-size:15px}#top .sub{display:none}#top .pill{display:inline-block}
+  #layers{top:auto;bottom:178px;right:12px;width:200px}
+  #layers.min .body{display:none}#layers.min{width:auto;padding:10px 40px 10px 14px}#lt{display:block}
+  #time{right:12px;bottom:46px}
+  #card{top:auto;left:12px;right:12px;width:auto;bottom:250px;max-height:36%}
+  #foot{font-size:10px}
+}
+#layers .body{max-height:calc(100vh - 230px);overflow:auto}
+#ygrid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px 6px;margin-top:4px}
+#ygrid label{margin:0;display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer}
+#ygrid i{width:9px;height:9px;border-radius:2px;display:inline-block;flex:none}
+.mini{border:1px solid #D5DBE2;background:#fff;border-radius:6px;font-size:11px;padding:1px 7px;margin-left:4px;cursor:pointer;color:inherit}
+#yrbig{position:absolute;left:24px;bottom:176px;font-size:76px;font-weight:800;line-height:1;color:#191F28;pointer-events:none;display:none;text-shadow:0 2px 14px rgba(255,255,255,.95)}
+#yrbig small{display:block;font-size:15px;font-weight:600;margin-top:6px;color:#4E5968}
+@media (max-width:760px){#yrbig{font-size:52px;bottom:200px}}
+#time{right:auto;width:auto;max-width:calc(100% - 270px);padding:8px 12px}
+#time #bars,#time .rng,#time .axis{display:none}
+#time .hd{margin:0;gap:14px}
+@media (max-width:760px){#time{max-width:calc(100% - 24px)}}
+#play{position:absolute;top:78px;left:12px;z-index:5;font:700 18px/1 inherit;font-family:inherit;padding:14px 26px;border-radius:14px;border:0;background:#3182F6;color:#fff;box-shadow:0 6px 18px rgba(49,130,246,.45);cursor:pointer}
+#play:hover{background:#1B64DA}
+#card{top:140px}
+@media (max-width:760px){#play{top:68px;font-size:16px;padding:12px 22px}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="panel" id="top">
+  <h1>서울 상업용 통건물 실거래 지도</h1>
+  <span class="pill">최신 신고 반영 · 일 1회 갱신</span>
+  <span class="sub" id="meta">불러오는 중…</span>
+  
+</div>
+
+<button id="play">▶ 재생</button>
+
+<div class="panel" id="layers">
+  <button id="lt">레이어 ▾</button>
+  <div class="body">
+  <h2>레이어</h2>
+  <label><input type="checkbox" id="ld" checked><span class="sw" style="background:#7B2CBF;opacity:.6"></span>동 단위 집계</label>
+  <label><input type="checkbox" id="lx" checked><span class="sw" style="background:#3182F6"></span>정확매칭 <span id="nx" style="color:var(--text-weak)"></span></label>
+  <label><input type="checkbox" id="le"><span class="sw" style="background:transparent;border:2px solid #3182F6"></span>추정매칭 <span id="ne" style="color:var(--text-weak)"></span></label>
+  <label><input type="checkbox" id="lb" checked><span class="sw" style="background:#9AA5B1"></span>주변 건물 3D</label>
+  <h2 style="margin-top:10px">계약연도 <button class="mini" id="yall">전체</button><button class="mini" id="ynone">해제</button></h2>
+  <div id="ygrid"></div>
+  <h2 style="margin-top:10px">색 기준</h2>
+  <label><input type="radio" name="cm" value="pl" checked>대지 평단가</label>
+  <label><input type="radio" name="cm" value="y">계약연도</label>
+  <h2 style="margin-top:10px" id="lgt">대지 평단가 (만원/평)</h2>
+  <div class="legend"></div>
+  <div class="legend-l"><span id="lg0"></span><span id="lg1"></span></div>
+  </div>
+</div>
+
+<div class="panel" id="card"><span class="x" id="cx">×</span><div id="cb"></div></div>
+
+<div id="yrbig"></div>
+<div class="panel" id="time">
+  <div class="hd"><b>계약 연도</b><span id="range"></span></div>
+  <svg id="bars" preserveAspectRatio="none"></svg>
+  <div class="rng"><div class="track"></div><div class="fill" id="fill"></div>
+    <input type="range" id="r0" min="0" value="0" aria-label="시작 연도"><input type="range" id="r1" min="0" value="0" aria-label="끝 연도"></div>
+  <div class="axis"><span id="ax0"></span><span id="ax1"></span></div>
+</div>
+
+<div class="panel" id="foot">
+  참고자료이며 중개대상물 확인·설명서가 아닙니다. 원문은 실거래가 공개시스템·건축물대장에서 확인하세요.
+  통건물(유형 '일반')만 표시하며 구분상가는 포함되지 않습니다. 당월 거래는 신고기한 미경과로 표본이 얇습니다.
+  추정매칭 핀은 동일 스펙의 인접 건물일 수 있습니다. 과거 연도는 지번 복원율이 낮아 동 단위 집계로 보완하며, 지번을 복원하지 못한 거래는 점으로 표시되지 않습니다.
+  지도 © OpenFreeMap · © OpenMapTiles · 데이터 © OpenStreetMap contributors · 실거래가 국토교통부 · 건축물대장 건축HUB
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const fmtEok = m => m == null ? "미상" : (m / 10000).toFixed(m >= 100000 ? 1 : 2).replace(/\.?0+$/, "") + "억원";
+const ymLabel = ym => ym.slice(0, 4) + "-" + ym.slice(4);
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const PY = 3.3058;
+
+let deals = [], dongRows = [], years = [], lo = 0, hi = 0, pMin = 0, pMax = 1;
+const colorExpr = (prop) => ["interpolate", ["linear"], ["coalesce", ["get", prop], pMin],
+  pMin, "#CFE3FF", pMin + (pMax - pMin) * 0.4, "#3182F6", pMin + (pMax - pMin) * 0.75, "#7B2CBF", pMax, "#C1121F"];
+
+const map = new maplibregl.Map({
+  container: "map", center: [126.99, 37.5], zoom: 10.6, pitch: 35, bearing: 0, maxPitch: 75,
+  style: "https://tiles.openfreemap.org/styles/liberty"
+});
+map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-right");
+
+const yearsOn = new Set(); let cmode = "pl";
+const inRange = y => yearsOn.has(+y);
+const YSTOPS = [[0, "#FFD66B"], [0.35, "#F2994A"], [0.7, "#C2185B"], [1, "#3D1A78"]];
+const yearExpr = () => { const y0 = +years[0], y1 = +years[years.length - 1] || y0 + 1;
+  return ["interpolate", ["linear"], ["coalesce", ["get", "y"], y0], ...YSTOPS.flatMap(([t, c]) => [y0 + (y1 - y0) * t, c])]; };
+const curExpr = () => cmode === "y" ? yearExpr() : colorExpr("pl");
+function yearHex(y) { const t = (y - +years[0]) / ((+years[years.length - 1] - +years[0]) || 1);
+  for (let i = 1; i < YSTOPS.length; i++) if (t <= YSTOPS[i][0]) { const [t0, c0] = YSTOPS[i - 1], [t1, c1] = YSTOPS[i], u = (t - t0) / (t1 - t0);
+    const a = [1, 3, 5].map(k => parseInt(c0.substr(k, 2), 16)), b = [1, 3, 5].map(k => parseInt(c1.substr(k, 2), 16));
+    return "#" + a.map((v, k) => Math.round(v + (b[k] - v) * u).toString(16).padStart(2, "0")).join(""); }
+  return YSTOPS[YSTOPS.length - 1][1]; }
+function syncYearUI() { document.querySelectorAll("#ygrid input").forEach(i => i.checked = yearsOn.has(+i.dataset.y)); }
+function applyMode() {
+  if (map.getLayer("bld")) map.setPaintProperty("bld", "fill-extrusion-color", ["case", [">", ["get", "n"], 0], curExpr(), "#9AA5B1"]);
+  if (map.getLayer("dongs")) map.setPaintProperty("dongs", "circle-color", curExpr());
+  if (map.getLayer("deals")) { map.setPaintProperty("deals", "circle-color", ["case", ["==", ["get", "est"], 1], "rgba(255,255,255,0.0)", curExpr()]);
+    map.setPaintProperty("deals", "circle-stroke-color", ["case", ["==", ["get", "est"], 1], curExpr(), "#ffffff"]); }
+  const lg = document.querySelector(".legend");
+  if (cmode === "y") { lg.style.background = "linear-gradient(90deg," + YSTOPS.map(([t, c]) => c + " " + t * 100 + "%").join(",") + ")";
+    $("#lg0").textContent = years[0]; $("#lg1").textContent = years[years.length - 1]; $("#lgt").textContent = "계약연도"; }
+  else { lg.style.background = ""; $("#lg0").textContent = Math.round(pMin).toLocaleString(); $("#lg1").textContent = Math.round(pMax).toLocaleString() + "+"; $("#lgt").textContent = "대지 평단가 (만원/평)"; }
+}
+function visibleDeals() {
+  const showX = $("#lx").checked, showE = $("#le").checked;
+  return deals.filter(d => inRange(+d.contractYm.slice(0, 4)) && (d.confidence === "추정매칭" ? showE : showX));
+}
+function dealsGeo() {
+  return { type: "FeatureCollection", features: visibleDeals().map(d => ({ type: "Feature",
+    geometry: { type: "Point", coordinates: [d.lng, d.lat] },
+    properties: { i: d._i, pl: d.pyeongLand, y: +d.contractYm.slice(0, 4), est: d.confidence === "추정매칭" ? 1 : 0 } })) };
+}
+/* 동 집계: 복원본(r)+미복원본(u) 합산, 선택 연도 범위만. 평단가는 금액합/대지평합 가중평균 */
+function dongsGeo() {
+  const m = new Map();
+  dongRows.filter(r => inRange(+r.year)).forEach(r => {
+    const k = r.gu + r.dong; const a = m.get(k) || { gu: r.gu, dong: r.dong, lat: r.lat, lng: r.lng, n: 0, p: 0, l: 0 };
+    a.n += r.n; a.p += r.sumPrice; a.l += r.sumLand; a.ys = (a.ys || 0) + (+r.year) * r.n; m.set(k, a);
+  });
+  return { type: "FeatureCollection", features: [...m.values()].map(a => ({ type: "Feature",
+    geometry: { type: "Point", coordinates: [a.lng, a.lat] },
+    properties: { name: a.gu + " " + a.dong, n: a.n, y: a.n ? Math.round(a.ys / a.n) : null, pl: a.l ? Math.round(a.p / (a.l / PY)) : null } })) };
+}
+function refresh() {
+  const src = map.getSource("deals"); if (src) src.setData(dealsGeo());
+  const ds = map.getSource("dongs"); if (ds) ds.setData(dongsGeo());
+  const tot = dongRows.filter(r => inRange(+r.year)).reduce((s, r) => s + r.n, 0);
+  $("#range").textContent = (yearsOn.size === years.length ? "전체 연도" : yearsOn.size + "개 연도 선택") + " · 전체 거래 " + (tot || visibleDeals().length).toLocaleString() + "건 · 지도 표시 " + visibleDeals().length.toLocaleString() + "건";
+  const f = $("#fill"), n = years.length - 1 || 1; f.style.left = (lo / n * 100) + "%"; f.style.width = ((hi - lo) / n * 100) + "%";
+  recolorBuildings();
+}
+function drawBars() {
+  const tot = years.map(y => dongRows.filter(r => r.year === y).reduce((s, r) => s + r.n, 0));
+  const pts = years.map(y => deals.filter(d => d.contractYm.startsWith(y)).length);
+  const mx = Math.max(...tot, ...pts, 1), w = 100 / years.length;
+  $("#bars").setAttribute("viewBox", "0 0 100 50");
+  $("#bars").innerHTML = years.map((y, i) => `<rect x="${i * w + w * 0.1}" y="${50 - tot[i] / mx * 48}" width="${w * 0.8}" height="${tot[i] / mx * 48}" rx="0.7" fill="${cssVar("--blue-weak")}" stroke="${cssVar("--blue")}" stroke-width=".25" opacity=".9"/>` +
+    `<rect x="${i * w + w * 0.1}" y="${50 - pts[i] / mx * 48}" width="${w * 0.8}" height="${pts[i] / mx * 48}" rx="0.7" fill="${cssVar("--blue")}" opacity=".8"/>`).join("");
+  $("#ax0").textContent = years[0]; $("#ax1").textContent = years[years.length - 1];
+}
+
+/* 건물 폴리곤: OpenFreeMap 타일은 건물 수천 채를 MultiPolygon 하나로 묶어 내려주므로 한 채씩 분해해서 판정한다.
+   거래가 한 번이라도 있는 건물(bld)만 연도 범위에 따라 색이 바뀌고, 나머지(bldg)는 정적 회색이다. */
+const bldSeen = new Set(), dealBlds = [], grayBlds = [];
+function inRing(pt, ring) { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, yi] = ring[i], [xj, yj] = ring[j]; if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) c = !c; } return c; }
+function recolorBuildings() {
+  const s = map.getSource("bld"); if (!s) return;
+  const vis = new Set(visibleDeals().map(d => d._i));
+  s.setData({ type: "FeatureCollection", features: dealBlds.map(({ feat, idx }, bi) => {
+    const hit = idx.filter(i => vis.has(i));
+    const pl = hit.length ? hit.reduce((a, i) => a + (deals[i].pyeongLand || 0), 0) / hit.length : null;
+    const y = hit.length ? Math.max(...hit.map(i => +deals[i].contractYm.slice(0, 4))) : null;
+    return { type: "Feature", geometry: feat.geometry, properties: Object.assign({}, feat.properties, { pl, y, n: hit.length, bi }) };
+  }) });
+}
+let bldTimer = null;
+function loadBuildings() {
+  if (map.getZoom() < 15.5 || !$("#lb").checked) return;
+  let added = 0;
+  map.querySourceFeatures("openmaptiles", { sourceLayer: "building" }).forEach(f => {
+    const g = f.geometry; if (!g) return;
+    const polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [];
+    const height = f.properties.render_height || 9, base = f.properties.render_min_height || 0;
+    polys.forEach(p => {
+      const ring = p[0], k = ring[0][0] + "," + ring[0][1] + "|" + ring.length;
+      if (bldSeen.has(k)) return; bldSeen.add(k); added++;
+      let a = 180, b = 90, c = -180, d = -90;
+      ring.forEach(([x, y]) => { if (x < a) a = x; if (x > c) c = x; if (y < b) b = y; if (y > d) d = y; });
+      const idx = []; deals.forEach(q => { if (q.lng >= a && q.lng <= c && q.lat >= b && q.lat <= d && inRing([q.lng, q.lat], ring)) idx.push(q._i); });
+      const feat = { type: "Feature", geometry: { type: "Polygon", coordinates: p }, properties: { height, base } };
+      if (idx.length) dealBlds.push({ feat, idx }); else grayBlds.push(feat);
+    });
+  });
+  if (!added) return;
+  const gs = map.getSource("bldg"); if (gs) gs.setData({ type: "FeatureCollection", features: grayBlds });
+  recolorBuildings();
+}
+
+map.on("load", async () => {
+  if (map.getLayer("building-3d")) map.setLayoutProperty("building-3d", "visibility", "none");   // 거래 색칠 건물과 겹치지 않게
+  const st = await (await fetch("data/deals.json")).json();
+  const all = st.items || [];
+  deals = all.filter(i => i.board === "map" && i.lat != null).map((d, i) => Object.assign(d, { _i: i }));
+  dongRows = all.filter(i => i.board === "dong");
+  const ys = new Set([...deals.map(d => d.contractYm.slice(0, 4)), ...dongRows.map(r => r.year)]);
+  years = [...ys].sort();
+  if (!years.length) { $("#meta").textContent = "지도 데이터 없음 — 실거래 CSV를 import 하세요"; return; }
+  const pls = [...deals.map(d => d.pyeongLand), ...dongRows.filter(r => r.sumLand).map(r => r.sumPrice / (r.sumLand / PY))].filter(Boolean).sort((a, b) => a - b);
+  pMin = pls[Math.floor(pls.length * 0.05)]; pMax = pls[Math.floor(pls.length * 0.95)];
+  $("#lg0").textContent = Math.round(pMin).toLocaleString(); $("#lg1").textContent = Math.round(pMax).toLocaleString() + "+";
+  hi = years.length - 1;
+  years.forEach(y => yearsOn.add(+y));
+  $("#ygrid").innerHTML = years.map(y => `<label><input type="checkbox" data-y="${y}" checked><i style="background:${yearHex(+y)}"></i>${y}</label>`).join("");
+  $("#ygrid").onchange = e => { const y = +e.target.dataset.y; e.target.checked ? yearsOn.add(y) : yearsOn.delete(y); refresh(); };
+  $("#yall").onclick = () => { years.forEach(y => yearsOn.add(+y)); syncYearUI(); refresh(); };
+  $("#ynone").onclick = () => { yearsOn.clear(); syncYearUI(); refresh(); };
+  document.querySelectorAll('input[name="cm"]').forEach(r => r.onchange = () => { cmode = r.value; applyMode(); });
+  ["#r0", "#r1"].forEach(s => { $(s).max = years.length - 1; });
+  $("#r0").value = lo; $("#r1").value = hi;
+  $("#nx").textContent = "(" + deals.filter(d => d.confidence !== "추정매칭").length.toLocaleString() + ")";
+  $("#ne").textContent = "(" + deals.filter(d => d.confidence === "추정매칭").length.toLocaleString() + ")";
+  $("#meta").textContent = years[0] + " ~ " + years[years.length - 1] + " · 점 " + deals.length.toLocaleString() + "건";
+  drawBars();
+
+  map.addSource("bldg", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addLayer({ id: "bldg", type: "fill-extrusion", source: "bldg", minzoom: 15.5, paint: {
+    "fill-extrusion-color": "#9AA5B1", "fill-extrusion-height": ["get", "height"], "fill-extrusion-base": ["get", "base"], "fill-extrusion-opacity": 0.85 } });
+  map.addSource("bld", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addLayer({ id: "bld", type: "fill-extrusion", source: "bld", minzoom: 15.5, paint: {
+    "fill-extrusion-color": ["case", [">", ["get", "n"], 0], colorExpr("pl"), "#9AA5B1"],
+    "fill-extrusion-height": ["get", "height"], "fill-extrusion-base": ["get", "base"], "fill-extrusion-opacity": 0.85 } });
+  map.addSource("dongs", { type: "geojson", data: dongsGeo() });
+  map.addLayer({ id: "dongs", type: "circle", source: "dongs", maxzoom: 15, paint: {
+    "circle-radius": ["interpolate", ["linear"], ["sqrt", ["get", "n"]], 1, 10, 12, 22, 30, 42],
+    "circle-color": colorExpr("pl"), "circle-opacity": ["interpolate", ["linear"], ["zoom"], 12, 0.78, 15, 0.15],
+    "circle-stroke-color": "#ffffff", "circle-stroke-width": 1.5, "circle-pitch-alignment": "viewport" } });
+  map.addSource("deals", { type: "geojson", data: dealsGeo() });
+  map.addLayer({ id: "deals", type: "circle", source: "deals", minzoom: 14, paint: {
+    "circle-radius": ["interpolate", ["linear"], ["zoom"], 14, 3, 17, 9],
+    "circle-color": ["case", ["==", ["get", "est"], 1], "rgba(255,255,255,0.0)", colorExpr("pl")],
+    "circle-stroke-color": ["case", ["==", ["get", "est"], 1], colorExpr("pl"), "#ffffff"],
+    "circle-stroke-width": ["case", ["==", ["get", "est"], 1], 2.2, 1.2],
+    "circle-opacity": ["interpolate", ["linear"], ["zoom"], 14, 0, 14.6, 1], "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 14, 0, 14.6, 1] } });
+  refresh(); loadBuildings();
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) setTimeout(startShow, 700);
+
+  map.on("idle", () => { if (map.getZoom() >= 15.5 && $("#lb").checked) loadBuildings(); });
+  map.on("moveend", () => { clearTimeout(bldTimer); bldTimer = setTimeout(loadBuildings, 250); });
+  map.on("click", "deals", e => showCard(deals[e.features[0].properties.i]));
+  map.on("click", "bld", e => {
+    if (map.queryRenderedFeatures(e.point, { layers: ["deals"] }).length) return;   // 점을 눌렀으면 점 쪽 처리
+    const p = e.features[0].properties; if (p.bi == null) return;
+    const ds = dealBlds[p.bi].idx.map(i => deals[i]).sort((a, b) => b.contractYm.localeCompare(a.contractYm));
+    if (ds.length) showCard(ds[0]);
+  });
+  map.on("mouseenter", "bld", () => map.getCanvas().style.cursor = "pointer");
+  map.on("mouseleave", "bld", () => map.getCanvas().style.cursor = "");
+  const pop = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 8 });
+  map.on("mousemove", "dongs", e => { const p = e.features[0].properties; map.getCanvas().style.cursor = "pointer";
+    pop.setLngLat(e.lngLat).setHTML(`${p.name}<br><span style="font-weight:500;color:#4E5968">${p.n}건 · 평단가 ${p.pl ? Number(p.pl).toLocaleString() + "만원" : "-"}</span>`).addTo(map); });
+  map.on("mouseleave", "dongs", () => { map.getCanvas().style.cursor = ""; pop.remove(); });
+  map.on("click", "dongs", e => map.easeTo({ center: e.lngLat, zoom: 15.6, duration: 700 }));
+  map.on("mouseenter", "deals", () => map.getCanvas().style.cursor = "pointer");
+  map.on("mouseleave", "deals", () => map.getCanvas().style.cursor = "");
+});
+
+function histHtml(d) {
+  const hs = deals.filter(x => x.title === d.title).sort((a, b) => (a.contractYm + (a.contractDay || "").padStart(2, "0")).localeCompare(b.contractYm + (b.contractDay || "").padStart(2, "0")));
+  const rows = hs.map((x, i) => {
+    const pr = i && hs[i - 1].price ? (x.price / hs[i - 1].price - 1) * 100 : null;
+    const chg = pr == null ? "" : ` <small style="color:${pr >= 0 ? "#C1121F" : "#1B64DA"}">(${pr >= 0 ? "+" : ""}${pr.toFixed(0)}%)</small>`;
+    const me = x._i === d._i;
+    return `<div class="row" style="${me ? "font-weight:700" : ""}"><span>${me ? "● " : ""}${ymLabel(x.contractYm)}${x.contractDay ? "-" + String(x.contractDay).padStart(2, "0") : ""}${x.confidence === "추정매칭" ? " (추정)" : ""}</span><b>${fmtEok(x.price)}${x.pyeongLand ? " · " + x.pyeongLand.toLocaleString() + "만/평" : ""}${chg}</b></div>`;
+  }).reverse().join("");
+  return `<h2 style="margin:14px 0 4px">이 지번 거래 이력 (${hs.length}건)</h2>${rows}<p style="font-size:11.5px;color:#6B7684;margin:6px 0 0">지도에 올라온 거래 기준입니다. 지번을 복원하지 못한 거래와 해제된 거래는 포함되지 않습니다.</p>`;
+}
+function showCard(d) {
+  const est = d.confidence === "추정매칭";
+  $("#cb").innerHTML = `<h2>${est ? "추정매칭" : "정확매칭"} · ${ymLabel(d.contractYm)}${d.contractDay ? "-" + String(d.contractDay).padStart(2, "0") : ""}</h2>
+    <p class="t">${d.title}</p>
+    <p class="big">${fmtEok(d.price)}</p>
+    <div class="row"><span>대지 평단가</span><b>${d.pyeongLand ? d.pyeongLand.toLocaleString() + "만원" : "-"}</b></div>
+    <div class="row"><span>연면적 평단가</span><b>${d.pyeongFloor ? d.pyeongFloor.toLocaleString() + "만원" : "-"}</b></div>
+    <div class="row"><span>대지 / 연면적</span><b>${d.landArea ?? "-"}㎡ / ${d.floorArea ?? "-"}㎡</b></div>
+    <div class="row"><span>용도 · 용도지역</span><b>${d.use || "-"} · ${d.zone || "-"}</b></div>
+    <div class="row"><span>건축년도</span><b>${d.builtYear || "-"}</b></div>
+    ${histHtml(d)}
+    ${est ? '<div class="warn">추정매칭입니다. 동일 스펙의 인접 건물일 수 있으니 원문(실거래가 공개시스템·건축물대장)을 확인하세요.</div>' : ""}`;
+  $("#card").style.display = "block";
+  map.easeTo({ center: [d.lng, d.lat], zoom: Math.max(map.getZoom(), 16.5), duration: 600 });
+}
+$("#cx").onclick = () => $("#card").style.display = "none";
+["#lx", "#le"].forEach(s => $(s).onchange = refresh);
+$("#ld").onchange = () => { if (map.getLayer("dongs")) map.setLayoutProperty("dongs", "visibility", $("#ld").checked ? "visible" : "none"); };
+$("#lb").onchange = () => { ["bld", "bldg"].forEach(l => { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", $("#lb").checked ? "visible" : "none"); }); loadBuildings(); };
+$("#r0").oninput = () => { lo = Math.min(+$("#r0").value, hi); $("#r0").value = lo; setRange(); };
+$("#r1").oninput = () => { hi = Math.max(+$("#r1").value, lo); $("#r1").value = hi; setRange(); };
+let anim = null;
+function stopPlay() {
+  if (!anim) return; cancelAnimationFrame(anim.raf); const a = anim; anim = null;
+  $("#play").textContent = "▶ 재생"; $("#yrbig").style.display = "none";
+  if (map.getLayer("bld")) map.setPaintProperty("bld", "fill-extrusion-height", ["get", "height"]);
+  if (map.getLayer("dongs")) map.setPaintProperty("dongs", "circle-radius", a.rBase);
+}
+function startPlay() {
+  if (anim) return stopPlay();
+  if (!years.length) return;
+  anim = { i: -1, t0: performance.now(), rBase: map.getPaintProperty("dongs", "circle-radius"), b0: map.getBearing() };
+  $("#play").textContent = "■ 정지"; $("#yrbig").style.display = "block";
+  const STEP = 1500;
+  const setYear = i => {
+    yearsOn.clear(); years.forEach((y, k) => { if (k <= i) yearsOn.add(+y); }); syncYearUI(); refresh();
+    const tot = dongRows.filter(r => +r.year <= +years[i]).reduce((s, r) => s + r.n, 0);
+    $("#yrbig").innerHTML = years[i] + "<small>누적 " + tot.toLocaleString() + "건</small>";
+  };
+  const tick = now => {
+    if (!anim) return;
+    const el = now - anim.t0, i = Math.floor(el / STEP);
+    if (i >= years.length) { stopPlay(); return; }
+    if (i !== anim.i) { anim.i = i; setYear(i); }
+    const g = Math.min(1, (el - i * STEP) / (STEP * 0.6)), e = 1 - Math.pow(1 - g, 3), cur = +years[i];
+    map.setPaintProperty("bld", "fill-extrusion-height", ["case", ["==", ["get", "y"], cur], ["*", ["get", "height"], 0.05 + 0.95 * e], ["get", "height"]]);
+    map.setPaintProperty("dongs", "circle-radius", ["*", 0.6 + 0.4 * e, anim.rBase]);
+    if (!flightOn) map.setBearing(anim.b0 + el / 1000 * 3);
+    anim.raf = requestAnimationFrame(tick);
+  };
+  anim.raf = requestAnimationFrame(tick);
+}
+let flightOn = false;
+const FLIGHT = [
+  { c: [127.0395, 37.4985], z: 13.4, p: 55, b: -20, d: 5000 },
+  { c: [127.0495, 37.5042], z: 16.2, p: 68, b: 60, d: 6000 },    // 선릉·역삼 테헤란로
+  { c: [127.0590, 37.5115], z: 16.2, p: 68, b: 150, d: 6000 },   // 삼성
+  { c: [127.0240, 37.5180], z: 16.2, p: 68, b: 230, d: 6000 },   // 논현·신사
+  { c: [127.0395, 37.4985], z: 13.6, p: 55, b: -15, d: 6000 }
+];
+function startFlight() {
+  flightOn = true; let k = 0;
+  map.jumpTo({ center: [126.99, 37.5], zoom: 10.6, pitch: 35, bearing: 0 });
+  const next = () => {
+    if (!flightOn) return;
+    if (k >= FLIGHT.length) { flightOn = false; return; }
+    const s = FLIGHT[k++];
+    map.flyTo({ center: s.c, zoom: s.z, pitch: s.p, bearing: s.b, duration: s.d, curve: 1.2, essential: true });
+    map.once("moveend", next);
+  };
+  next();
+}
+["mousedown", "touchstart", "wheel"].forEach(ev => map.on(ev, () => { flightOn = false; }));   // 손대면 비행 중단
+function startShow() { if (!anim) { startFlight(); startPlay(); } }
+function toggleShow() { if (anim) { flightOn = false; map.stop(); stopPlay(); } else startShow(); }
+$("#play").onclick = toggleShow;
+["#ygrid", "#r0", "#r1"].forEach(s => ["change", "input"].forEach(ev => $(s).addEventListener(ev, () => { if (anim) stopPlay(); })));
+function setRange() { yearsOn.clear(); years.forEach((y, i) => { if (i >= lo && i <= hi) yearsOn.add(+y); }); syncYearUI(); refresh(); }
+$("#lt").onclick = () => $("#layers").classList.toggle("min");
+if (matchMedia("(max-width:760px)").matches) $("#layers").classList.add("min");
+</script>
+</body>
+</html>
